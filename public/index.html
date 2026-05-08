@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rhine Cleaning — War Room</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green: #00C48C; --bg: #0A0F0D; --bg2: #111814; --bg3: #182018;
+    --border: rgba(0,196,140,0.15); --border-bright: rgba(0,196,140,0.35);
+    --text: #E8F5F0; --text-dim: #7A9E8E; --text-muted: #3D5A4E;
+    --red: #FF4D4D; --amber: #FFB020; --blue: #4DA6FF;
+    --mono: 'DM Mono', monospace; --sans: 'Syne', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; }
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background-image: linear-gradient(rgba(0,196,140,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,196,140,0.03) 1px, transparent 1px);
+    background-size: 40px 40px; pointer-events: none; z-index: 0;
+  }
+  .wrapper { position: relative; z-index: 1; padding: 20px; max-width: 1400px; margin: 0 auto; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; background: var(--bg2); border: 1px solid var(--border-bright); border-radius: 12px; margin-bottom: 16px; }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo-icon { width: 36px; height: 36px; background: var(--green); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+  .logo-text { font-size: 20px; font-weight: 800; letter-spacing: -0.5px; }
+  .logo-sub { font-family: var(--mono); font-size: 11px; color: var(--green); letter-spacing: 0.1em; text-transform: uppercase; }
+  .topbar-right { display: flex; align-items: center; gap: 20px; }
+  .live-badge { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12px; color: var(--green); }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: blink 2s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+  .clock { font-family: var(--mono); font-size: 22px; font-weight: 500; }
+  .date-str { font-family: var(--mono); font-size: 11px; color: var(--text-dim); text-align: right; }
+  .status-bar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+  .pill { font-family: var(--mono); font-size: 10px; padding: 4px 12px; border-radius: 20px; }
+  .pill-ok { background: rgba(0,196,140,0.12); color: var(--green); border: 1px solid rgba(0,196,140,0.3); }
+  .pill-warn { background: rgba(255,176,32,0.12); color: var(--amber); border: 1px solid rgba(255,176,32,0.3); }
+  .pill-err { background: rgba(255,77,77,0.12); color: var(--red); border: 1px solid rgba(255,77,77,0.3); }
+  .last-sync { font-family: var(--mono); font-size: 10px; color: var(--text-muted); margin-left: auto; }
+  .metrics { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 16px; }
+  .metric { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; position: relative; overflow: hidden; }
+  .metric::after { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:var(--green); opacity:0.4; }
+  .metric.alert::after { background: var(--red); }
+  .metric-label { font-family: var(--mono); font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; }
+  .metric-val { font-size: 32px; font-weight: 800; line-height: 1; margin-bottom: 6px; }
+  .metric-val.editable:focus { outline: 1px solid var(--green); border-radius: 4px; padding: 2px 6px; }
+  .metric-sub { font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
+  .metric-sub.up { color: var(--green); } .metric-sub.down { color: var(--red); }
+  .main-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .wide-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; }
+  .card-title { font-family: var(--mono); font-size: 10px; color: var(--green); text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+  .card-title::before { content:''; display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--green); }
+  .job-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .job-row:last-child { border-bottom: none; }
+  .job-time { font-family: var(--mono); font-size: 12px; color: var(--text-dim); width: 60px; flex-shrink: 0; }
+  .job-info { flex: 1; }
+  .job-name { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+  .job-detail { font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
+  .badge { font-family: var(--mono); font-size: 10px; font-weight: 500; padding: 3px 10px; border-radius: 20px; white-space: nowrap; flex-shrink: 0; }
+  .b-green { background: rgba(0,196,140,0.15); color: var(--green); border: 1px solid rgba(0,196,140,0.3); }
+  .b-amber { background: rgba(255,176,32,0.12); color: var(--amber); border: 1px solid rgba(255,176,32,0.3); }
+  .b-gray { background: rgba(255,255,255,0.05); color: var(--text-dim); border: 1px solid var(--border); }
+  .b-blue { background: rgba(77,166,255,0.12); color: var(--blue); border: 1px solid rgba(77,166,255,0.3); }
+  .add-row { display: flex; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+  .add-row input, .add-row select { background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: var(--mono); font-size: 11px; padding: 6px 10px; outline: none; }
+  .add-row input:focus, .add-row select:focus { border-color: var(--green); }
+  .add-row input { flex: 1; min-width: 80px; }
+  .btn { background: var(--green); color: var(--bg); border: none; border-radius: 6px; font-family: var(--mono); font-size: 11px; font-weight: 500; padding: 6px 14px; cursor: pointer; }
+  .btn:hover { opacity: 0.85; }
+  .btn-ghost { background: transparent; color: var(--text-dim); border: 1px solid var(--border); border-radius: 6px; font-family: var(--mono); font-size: 11px; padding: 6px 14px; cursor: pointer; }
+  .btn-refresh { background: rgba(0,196,140,0.1); color: var(--green); border: 1px solid rgba(0,196,140,0.3); border-radius: 6px; font-family: var(--mono); font-size: 11px; padding: 6px 14px; cursor: pointer; }
+  .check-item { display: flex; align-items: flex-start; gap: 10px; padding: 8px 6px; border-radius: 6px; cursor: pointer; user-select: none; }
+  .check-item:hover { background: var(--bg3); }
+  .check-item.done .check-label { text-decoration: line-through; color: var(--text-muted); }
+  .check-box { width: 16px; height: 16px; border: 1.5px solid var(--text-muted); border-radius: 4px; flex-shrink: 0; margin-top: 1px; display: flex; align-items: center; justify-content: center; }
+  .check-item.done .check-box { background: var(--green); border-color: var(--green); }
+  .check-tick { display: none; }
+  .check-item.done .check-tick { display: block; width: 10px; height: 10px; }
+  .check-label { font-size: 13px; line-height: 1.4; flex: 1; }
+  .client-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+  .client-row:last-child { border-bottom: none; }
+  .client-avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--bg3); border: 1px solid var(--border-bright); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: var(--green); flex-shrink: 0; }
+  .client-name { font-size: 13px; }
+  .exp-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .exp-row:last-child { border-bottom: none; }
+  .exp-name { font-size: 13px; }
+  .exp-amt { font-family: var(--mono); font-size: 13px; font-weight: 500; }
+  .exp-amt:focus { outline: 1px solid var(--green); border-radius: 4px; padding: 1px 4px; }
+  .exp-neg { color: var(--red); } .exp-pos { color: var(--green); }
+  .step-row { display: flex; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border); align-items: flex-start; }
+  .step-row:last-child { border-bottom: none; }
+  .step-num { width: 22px; height: 22px; border-radius: 50%; background: var(--bg3); border: 1px solid var(--border-bright); font-family: var(--mono); font-size: 10px; color: var(--green); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .step-text { font-size: 13px; line-height: 1.4; }
+  .notes-area { width: 100%; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: var(--mono); font-size: 12px; padding: 12px; resize: vertical; min-height: 100px; outline: none; line-height: 1.6; }
+  .notes-area:focus { border-color: var(--green); }
+  .bottom-bar { display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; margin-top: 12px; }
+  .bottom-stat { text-align: center; }
+  .bottom-stat-label { font-family: var(--mono); font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; }
+  .bottom-stat-val { font-size: 16px; font-weight: 700; }
+  .profit-bar-wrap { flex: 1; margin: 0 32px; }
+  .profit-bar-labels { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10px; color: var(--text-dim); margin-bottom: 4px; }
+  .profit-bar-bg { height: 8px; background: rgba(255,77,77,0.2); border-radius: 4px; overflow: hidden; }
+  .profit-bar-fill { height: 100%; background: var(--green); border-radius: 4px; transition: width 0.6s ease; }
+  .empty-state { font-family: var(--mono); font-size: 12px; color: var(--text-muted); padding: 20px 0; text-align: center; }
+  .auth-banner { background: rgba(255,176,32,0.1); border: 1px solid rgba(255,176,32,0.3); border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; }
+  .auth-banner a { color: var(--amber); font-family: var(--mono); font-size: 12px; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  .metric, .card { animation: fadeIn 0.4s ease both; }
+  ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: var(--bg); } ::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 3px; }
+  @media(max-width:900px) { .metrics { grid-template-columns: repeat(2,1fr); } .main-grid, .wide-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <div class="topbar">
+    <div class="logo">
+      <div class="logo-icon">🧹</div>
+      <div>
+        <div class="logo-text">Rhine Cleaning</div>
+        <div class="logo-sub">Operations War Room</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <button class="btn-refresh" onclick="refreshAll()">⟳ Refresh</button>
+      <div>
+        <div class="clock" id="clock">--:--:--</div>
+        <div class="date-str" id="date"></div>
+      </div>
+      <div class="live-badge"><div class="live-dot"></div> LIVE</div>
+    </div>
+  </div>
+
+  <div id="auth-banner" style="display:none" class="auth-banner">
+    ⚠️ Jobber not connected. <a id="auth-link" href="#" target="_blank">Click here to connect →</a>
+  </div>
+
+  <div class="status-bar">
+    <span class="pill pill-warn" id="pill-jobber">⬤ Jobber — connecting...</span>
+    <span class="pill pill-warn" id="pill-todos">⬤ Todos — loading...</span>
+    <span class="last-sync" id="last-sync">Never synced</span>
+  </div>
+
+  <div class="metrics">
+    <div class="metric">
+      <div class="metric-label">Total jobs</div>
+      <div class="metric-val" id="m-jobs">—</div>
+      <div class="metric-sub up">Live from Jobber</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Total clients</div>
+      <div class="metric-val" id="m-clients">—</div>
+      <div class="metric-sub up">Live from Jobber</div>
+    </div>
+    <div class="metric alert">
+      <div class="metric-label">Outstanding invoices</div>
+      <div class="metric-val" id="m-invoices">$—</div>
+      <div class="metric-sub down" id="m-invoices-sub">Live from Jobber</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Monthly revenue</div>
+      <div class="metric-val editable" id="m-revenue" contenteditable="true" spellcheck="false">$—</div>
+      <div class="metric-sub up">Click to update</div>
+    </div>
+  </div>
+
+  <div class="main-grid">
+    <div class="card">
+      <div class="card-title">Jobs from Jobber</div>
+      <div id="jobs-list"><div class="empty-state">Connecting to Jobber...</div></div>
+      <div class="add-row">
+        <input type="text" id="new-job-time" placeholder="Time" style="width:80px;flex:none">
+        <input type="text" id="new-job-name" placeholder="Client & job type">
+        <input type="text" id="new-job-detail" placeholder="e.g. 2hr · $150" style="width:100px;flex:none">
+        <select id="new-job-status">
+          <option value="scheduled">scheduled</option>
+          <option value="confirmed">confirmed</option>
+          <option value="en route">en route</option>
+          <option value="complete">complete</option>
+        </select>
+        <button class="btn" onclick="addManualJob()">+ Add</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">To-do list <span style="color:var(--text-muted);font-size:9px;margin-left:4px">syncs all devices</span></div>
+      <div id="todo-list"><div class="empty-state">Loading...</div></div>
+      <div class="add-row">
+        <input type="text" id="new-todo" placeholder="Add a new task...">
+        <button class="btn" onclick="addTodo()">+ Add</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="wide-grid">
+    <div class="card">
+      <div class="card-title">Clients from Jobber</div>
+      <div id="clients-list"><div class="empty-state">Loading...</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Monthly expenses <span style="color:var(--text-muted);font-size:9px;margin-left:4px">click to edit</span></div>
+      <div class="exp-row"><span class="exp-name">Staff wages</span><span class="exp-amt exp-neg" contenteditable="true">-$1,800</span></div>
+      <div class="exp-row"><span class="exp-name">Cleaning supplies</span><span class="exp-amt exp-neg" contenteditable="true">-$320</span></div>
+      <div class="exp-row"><span class="exp-name">Fuel & transport</span><span class="exp-amt exp-neg" contenteditable="true">-$210</span></div>
+      <div class="exp-row"><span class="exp-name">Marketing (Meta Ads)</span><span class="exp-amt exp-neg" contenteditable="true">-$200</span></div>
+      <div class="exp-row"><span class="exp-name">Software (Jobber, Quo)</span><span class="exp-amt exp-neg" contenteditable="true">-$120</span></div>
+      <div class="exp-row" style="margin-top:6px;padding-top:10px;border-top:1px solid var(--border-bright)">
+        <span class="exp-name" style="font-weight:700">Total expenses</span>
+        <span class="exp-amt exp-neg" style="font-weight:700">-$2,650</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Booking → completion workflow</div>
+      <div class="step-row"><div class="step-num">1</div><div class="step-text">Welcome message — confirm license</div></div>
+      <div class="step-row"><div class="step-num">2</div><div class="step-text">Confirmation — job time & details</div></div>
+      <div class="step-row"><div class="step-num">3</div><div class="step-text">Pre-job photos — document condition</div></div>
+      <div class="step-row"><div class="step-num">4</div><div class="step-text">Arrival message sent to client</div></div>
+      <div class="step-row"><div class="step-num">5</div><div class="step-text">Job complete — post-job photos</div></div>
+      <div class="step-row"><div class="step-num">6</div><div class="step-text">Invoice sent via Jobber</div></div>
+      <div class="step-row"><div class="step-num">7</div><div class="step-text">Thank you + request review</div></div>
+      <div class="step-row"><div class="step-num">8</div><div class="step-text">Follow up if unpaid after 3 days</div></div>
+    </div>
+  </div>
+
+  <div class="main-grid">
+    <div class="card">
+      <div class="card-title">Daily notes <span style="color:var(--text-muted);font-size:9px;margin-left:4px">syncs all devices</span></div>
+      <textarea class="notes-area" id="daily-notes" placeholder="Type your notes for today..."></textarea>
+    </div>
+    <div class="card">
+      <div class="card-title">Quick contacts</div>
+      <div class="exp-row"><span class="exp-name">Jobber support</span><span class="exp-amt" style="color:var(--blue)">1-888-721-1115</span></div>
+      <div class="exp-row"><span class="exp-name">Quickbooks</span><span class="exp-amt" style="color:var(--blue)">qbo.intuit.com</span></div>
+      <div class="exp-row"><span class="exp-name">Meta Ads</span><span class="exp-amt" style="color:var(--blue)">business.facebook.com</span></div>
+      <div class="exp-row"><span class="exp-name">Rhine email</span><span class="exp-amt" style="color:var(--blue)">rhinecleaning7@gmail.com</span></div>
+      <div class="exp-row"><span class="exp-name">Quo</span><span class="exp-amt" style="color:var(--blue)">quo.com</span></div>
+      <div class="exp-row"><span class="exp-name">Backend status</span><span class="exp-amt" style="color:var(--green);font-size:10px" id="backend-url">connecting...</span></div>
+    </div>
+  </div>
+
+  <div class="bottom-bar">
+    <div class="bottom-stat">
+      <div class="bottom-stat-label">Jobs</div>
+      <div class="bottom-stat-val" style="color:var(--green)" id="b-jobs">—</div>
+    </div>
+    <div class="profit-bar-wrap">
+      <div class="profit-bar-labels">
+        <span id="b-clients">Clients: —</span>
+        <span id="b-quotes">Quotes: —</span>
+        <span id="b-outstanding">Outstanding: $—</span>
+      </div>
+      <div class="profit-bar-bg"><div class="profit-bar-fill" id="profit-bar" style="width:30%"></div></div>
+    </div>
+    <div class="bottom-stat">
+      <div class="bottom-stat-label">Today's jobs</div>
+      <div class="bottom-stat-val" style="color:var(--amber)" id="b-today">—</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── BACKEND URL ───────────────────────────────────────────────────────────────
+// UPDATE THIS after deploying to Railway
+const BACKEND = 'REPLACE_WITH_RAILWAY_URL';
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let todosData = { todos: [], notes: '' };
+let saveTimeout = null;
+
+// ── CLOCK ─────────────────────────────────────────────────────────────────────
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  document.getElementById('date').textContent = now.toLocaleDateString([], {weekday:'long',month:'long',day:'numeric',year:'numeric'});
+}
+updateClock(); setInterval(updateClock, 1000);
+
+// ── LOAD JOBBER DATA ──────────────────────────────────────────────────────────
+async function loadJobberData() {
+  try {
+    document.getElementById('pill-jobber').className = 'pill pill-warn';
+    document.getElementById('pill-jobber').textContent = '⬤ Jobber — loading...';
+
+    const res = await fetch(`${BACKEND}/api/data`);
+    const data = await res.json();
+
+    if (res.status === 401) {
+      document.getElementById('auth-banner').style.display = 'flex';
+      document.getElementById('auth-link').href = `${BACKEND}/auth`;
+      document.getElementById('pill-jobber').className = 'pill pill-err';
+      document.getElementById('pill-jobber').textContent = '⬤ Jobber — not connected';
+      return;
+    }
+
+    document.getElementById('auth-banner').style.display = 'none';
+    const s = data.summary;
+
+    document.getElementById('m-jobs').textContent = s.totalJobs || '0';
+    document.getElementById('m-clients').textContent = s.totalClients || '0';
+    document.getElementById('m-invoices').textContent = '$' + (s.outstandingInvoices || '0.00');
+    document.getElementById('m-invoices-sub').textContent = parseFloat(s.outstandingInvoices) > 0 ? 'Needs collection' : 'All paid ✓';
+    document.getElementById('b-jobs').textContent = s.totalJobs || '0';
+    document.getElementById('b-clients').textContent = `Clients: ${s.totalClients || 0}`;
+    document.getElementById('b-quotes').textContent = `Quotes: ${s.activeQuotes || 0}`;
+    document.getElementById('b-outstanding').textContent = `Outstanding: $${s.outstandingInvoices || '0.00'}`;
+    document.getElementById('b-today').textContent = s.todaysJobCount || '0';
+
+    renderJobs(data.jobs || []);
+    renderClients(data.clients || []);
+
+    document.getElementById('pill-jobber').className = 'pill pill-ok';
+    document.getElementById('pill-jobber').textContent = '⬤ Jobber — live';
+    document.getElementById('last-sync').textContent = 'Synced ' + new Date(data.lastUpdated).toLocaleTimeString();
+    document.getElementById('backend-url').textContent = BACKEND.replace('https://', '');
+
+  } catch(e) {
+    document.getElementById('pill-jobber').className = 'pill pill-err';
+    document.getElementById('pill-jobber').textContent = '⬤ Jobber — offline';
+    document.getElementById('backend-url').textContent = 'Backend offline';
+  }
+}
+
+function renderJobs(jobs) {
+  const list = document.getElementById('jobs-list');
+  if (!jobs.length) { list.innerHTML = '<div class="empty-state">No jobs found in Jobber</div>'; return; }
+  list.innerHTML = jobs.map(job => {
+    const time = job.startAt ? new Date(job.startAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '—';
+    const status = (job.jobStatus || '').toLowerCase();
+    const bc = status === 'active' ? 'b-green' : status === 'upcoming' ? 'b-amber' : 'b-gray';
+    return `<div class="job-row">
+      <div class="job-time">${time}</div>
+      <div class="job-info">
+        <div class="job-name">${job.title || job.client?.name || 'Unnamed job'}</div>
+        <div class="job-detail">${job.client?.name || ''}${job.total ? ' · $' + job.total : ''}</div>
+      </div>
+      <span class="badge ${bc}">${status || 'scheduled'}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderClients(clients) {
+  const list = document.getElementById('clients-list');
+  if (!clients.length) { list.innerHTML = '<div class="empty-state">No clients found</div>'; return; }
+  list.innerHTML = clients.slice(0, 8).map(c => {
+    const initials = (c.name || '?').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+    return `<div class="client-row"><div class="client-avatar">${initials}</div><div class="client-name">${c.name}</div></div>`;
+  }).join('');
+}
+
+// ── TODOS ─────────────────────────────────────────────────────────────────────
+async function loadTodos() {
+  try {
+    const res = await fetch(`${BACKEND}/api/todos`);
+    todosData = await res.json();
+    renderTodos();
+    if (todosData.notes) document.getElementById('daily-notes').value = todosData.notes;
+    document.getElementById('pill-todos').className = 'pill pill-ok';
+    document.getElementById('pill-todos').textContent = '⬤ Todos — synced';
+  } catch(e) {
+    const local = JSON.parse(localStorage.getItem('todos') || '{"todos":[],"notes":""}');
+    todosData = local;
+    renderTodos();
+    if (todosData.notes) document.getElementById('daily-notes').value = todosData.notes;
+    document.getElementById('pill-todos').className = 'pill pill-warn';
+    document.getElementById('pill-todos').textContent = '⬤ Todos — local only';
+  }
+}
+
+function renderTodos() {
+  const list = document.getElementById('todo-list');
+  if (!todosData.todos?.length) { list.innerHTML = '<div class="empty-state">No tasks yet — add one below</div>'; return; }
+  list.innerHTML = todosData.todos.map((todo, i) => `
+    <div class="check-item ${todo.done ? 'done' : ''}" onclick="toggleTodo(${i})">
+      <div class="check-box"><svg class="check-tick" viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <span class="check-label">${todo.text}</span>
+      <button class="btn-ghost" style="padding:2px 8px;font-size:10px;flex-shrink:0" onclick="event.stopPropagation();deleteTodo(${i})">✕</button>
+    </div>
+  `).join('');
+}
+
+async function saveTodos() {
+  localStorage.setItem('todos', JSON.stringify(todosData));
+  clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(async () => {
+    try {
+      await fetch(`${BACKEND}/api/todos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(todosData)
+      });
+      document.getElementById('pill-todos').className = 'pill pill-ok';
+      document.getElementById('pill-todos').textContent = '⬤ Todos — saved';
+    } catch(e) {}
+  }, 1000);
+}
+
+function toggleTodo(i) { todosData.todos[i].done = !todosData.todos[i].done; renderTodos(); saveTodos(); }
+function deleteTodo(i) { todosData.todos.splice(i, 1); renderTodos(); saveTodos(); }
+
+function addTodo() {
+  const val = document.getElementById('new-todo').value.trim();
+  if (!val) return;
+  if (!todosData.todos) todosData.todos = [];
+  todosData.todos.push({ text: val, done: false, created: new Date().toISOString() });
+  renderTodos(); saveTodos();
+  document.getElementById('new-todo').value = '';
+}
+
+function addManualJob() {
+  const time = document.getElementById('new-job-time').value.trim();
+  const name = document.getElementById('new-job-name').value.trim();
+  const detail = document.getElementById('new-job-detail').value.trim();
+  const status = document.getElementById('new-job-status').value;
+  if (!name) return;
+  const map = {scheduled:'b-gray',confirmed:'b-green','en route':'b-amber',complete:'b-blue'};
+  const row = document.createElement('div');
+  row.className = 'job-row';
+  row.innerHTML = `<div class="job-time">${time||'—'}</div><div class="job-info"><div class="job-name">${name}</div><div class="job-detail">${detail||'—'}</div></div><span class="badge ${map[status]}">${status}</span><button class="btn-ghost" style="padding:3px 8px;font-size:10px;margin-left:6px" onclick="this.closest('.job-row').remove()">✕</button>`;
+  const list = document.getElementById('jobs-list');
+  const empty = list.querySelector('.empty-state');
+  if (empty) empty.remove();
+  list.appendChild(row);
+  document.getElementById('new-job-time').value = '';
+  document.getElementById('new-job-name').value = '';
+  document.getElementById('new-job-detail').value = '';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('daily-notes').addEventListener('input', e => {
+    todosData.notes = e.target.value;
+    saveTodos();
+  });
+  document.getElementById('new-todo').addEventListener('keydown', e => { if(e.key==='Enter') addTodo(); });
+  document.getElementById('new-job-name').addEventListener('keydown', e => { if(e.key==='Enter') addManualJob(); });
+
+  refreshAll();
+  setInterval(loadJobberData, 5 * 60 * 1000);
+  setInterval(loadTodos, 30 * 1000);
+});
+
+async function refreshAll() {
+  await Promise.all([loadJobberData(), loadTodos()]);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "rhine-war-room-backend",
+  "version": "1.0.0",
+  "description": "Rhine Cleaning War Room Backend - Jobber API sync server",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {}
+}
